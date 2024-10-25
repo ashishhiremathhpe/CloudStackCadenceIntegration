@@ -14,4 +14,12 @@
       </Content>
     </ItemGroup>
 
+    <ItemGroup>
+      <PackageReference Include="Neon.Cadence" Version="2.19.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\CloudStack.Net\CloudStack.Net.csproj" />
+    </ItemGroup>
+
 </Project>
