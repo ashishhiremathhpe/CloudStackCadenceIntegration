@@ -7,31 +7,31 @@ using Neon.Cadence;
 namespace CloudStackCadenceIntegration
 {
     [WorkflowInterface(TaskList = "my-tasks")]
-    public interface IHelloWorkflow : IWorkflow
+    public interface IListVMWorkflow : IWorkflow
     {
         [WorkflowMethod]
-        Task<string> HelloAsync(string serviceUrl, string apiKey, string secretKey);
+        Task<string> ListVMAsync(string serviceUrl, string apiKey, string secretKey);
     }
 
-    public class HelloWorkflow : WorkflowBase, IHelloWorkflow
+    public class ListVmWorkflow : WorkflowBase, IListVMWorkflow
     {
-        public async Task<string> HelloAsync(string serviceUrl, string apiKey, string secretKey)
+        public async Task<string> ListVMAsync(string serviceUrl, string apiKey, string secretKey)
         {
-            var activityStub = Workflow.NewActivityStub<ISendHelloActivity>();
-            return await activityStub.SendHelloAsync(serviceUrl, apiKey, secretKey);
+            var activityStub = Workflow.NewActivityStub<IListVMActivity>();
+            return await activityStub.ListVMAsync(serviceUrl, apiKey, secretKey);
         }
     }
 
     [ActivityInterface(TaskList = "my-tasks")]
-    public interface ISendHelloActivity : IActivity
+    public interface IListVMActivity : IActivity
     {
         [ActivityMethod]
-        Task<string> SendHelloAsync(string serviceUrl, string apiKey, string secretKey);
+        Task<string> ListVMAsync(string serviceUrl, string apiKey, string secretKey);
     }
 
-    public class SendHelloActivity : ActivityBase, ISendHelloActivity
+    public class ListVMActivity : ActivityBase, IListVMActivity
     {
-        public async Task<string> SendHelloAsync(string serviceUrl, string apiKey, string secretKey)
+        public async Task<string> ListVMAsync(string serviceUrl, string apiKey, string secretKey)
         {
             var client = new CloudStackAPIClient(
                 new CloudStackAPIProxy(serviceUrl, apiKey, secretKey)
@@ -72,8 +72,8 @@ namespace CloudStackCadenceIntegration
                 // Register your workflow implementation to let Cadence
                 // know we're open for business.
 
-                await client.RegisterWorkflowAsync<HelloWorkflow>();
-                await client.RegisterActivityAsync<SendHelloActivity>();
+                await client.RegisterWorkflowAsync<ListVmWorkflow>();
+                await client.RegisterActivityAsync<ListVMActivity>();
                 await client.StartWorkerAsync("my-tasks");
                 
                 // Start the web server
