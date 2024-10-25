@@ -1,4 +1,7 @@
 ﻿using CloudStack.Net;
+using CloudStackCadenceIntegration.Services;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.DependencyInjection;
 using Neon.Cadence;
 
 namespace CloudStackCadenceIntegration
@@ -57,7 +60,6 @@ namespace CloudStackCadenceIntegration
         public static async Task Main(string[] args)
         {
             // Connect to Cadence
-
             var settings = new CadenceSettings()
             {
                 DefaultDomain = "test-domain",
@@ -73,14 +75,21 @@ namespace CloudStackCadenceIntegration
                 await client.RegisterWorkflowAsync<HelloWorkflow>();
                 await client.RegisterActivityAsync<SendHelloActivity>();
                 await client.StartWorkerAsync("my-tasks");
+                
+                // Start the web server
+                var builder = WebApplication.CreateBuilder(args);
+                {
+                    builder.Services.AddSingleton(client);
+                    builder.Services.AddControllers();
+                    builder.Services.AddScoped<IVMService, VMService>();
+                }
 
-                // Invoke your workflow.
-
-                var stub = client.NewWorkflowStub<IHelloWorkflow>();
-
-                Console.WriteLine(await stub.HelloAsync("https://qa.cloudstack.cloud/client/api/",
-                    "8y--Jfz6BpGLR94eZiKi_1OQhHAQg43ApL_3EJesv8RmDvFpv8TSDTdYDQKT3fIdueb3mCUP9YZgrRuoUaiZmQ",
-                    "UKnRfBaAy8mm2SHaLUAYGKHUcKDWp1Ez9-QItMOfdDeK_JMaPXv4mG8_kabVfOwxMQ9pe7y1LSVh_Ff0ggd_jQ"));
+                var app = builder.Build();
+                {
+                    app.UseExceptionHandler("/error");
+                    app.MapControllers();
+                    app.Run();
+                }
             }
         }
     }
