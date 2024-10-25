@@ -2,6 +2,8 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CloudStackCadenceIntegration", "CloudStackCadenceIntegration\CloudStackCadenceIntegration.csproj", "{F86399AA-2EE7-4FE9-8D34-23ED8DDDB739}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "CloudStack.Net", "CloudStack.Net\CloudStack.Net.csproj", "{CAEF5C09-AA36-4E0A-8F05-861F9A8A9244}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -12,5 +14,9 @@ Global
 		{F86399AA-2EE7-4FE9-8D34-23ED8DDDB739}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{F86399AA-2EE7-4FE9-8D34-23ED8DDDB739}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{F86399AA-2EE7-4FE9-8D34-23ED8DDDB739}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CAEF5C09-AA36-4E0A-8F05-861F9A8A9244}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{CAEF5C09-AA36-4E0A-8F05-861F9A8A9244}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{CAEF5C09-AA36-4E0A-8F05-861F9A8A9244}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{CAEF5C09-AA36-4E0A-8F05-861F9A8A9244}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
