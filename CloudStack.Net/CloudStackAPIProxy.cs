@@ -11,14 +11,12 @@ using System.Text;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using Zerto.Infra.Log;
 
 namespace CloudStack.Net
 {
     public class CloudStackAPIProxy : ICloudStackAPIProxy
     {
         private static readonly MethodInfo _decodeListResponseMethod = typeof(CloudStackAPIProxy).GetMethod(nameof(DecodeListResponse), BindingFlags.Static | BindingFlags.NonPublic);
-        private static readonly Logger s_logger = LogManager.GetCurrentClassLogger();
         
         public CloudStackAPIProxy(string serviceUrl, string apiKey, string secretKey,TimeSpan httpRequestTimeout)
             : this(serviceUrl)
@@ -29,7 +27,6 @@ namespace CloudStack.Net
             ApiKey = apiKey;
             SecretKey = secretKey;
             HttpRequestTimeout = httpRequestTimeout;
-            s_logger.Info("Initialized successfully");
         }
 
         public CloudStackAPIProxy(string serviceUrl, string apiKey, string secretKey)
@@ -40,7 +37,6 @@ namespace CloudStack.Net
 
             ApiKey = apiKey;
             SecretKey = secretKey;
-            s_logger.Info("Initialized successfully");
         }
 
         public CloudStackAPIProxy(string serviceUrl, string sessionKey)
@@ -264,12 +260,10 @@ namespace CloudStack.Net
                 httpWebResponse.EnsureSuccessStatusCode();
 
                 string responseText = await httpWebResponse.Content.ReadAsStringAsync().ConfigureAwait(false);
-                s_logger.Info("Received response successfully");
                 return DecodeResponse<TResponse>(responseText);
             }
             catch (WebException e)
             {
-                s_logger.Error(e, "caught exception while sending http request!");
                 throw CreateCloudStackException(e, webRequest.RequestUri);
             }
         }
