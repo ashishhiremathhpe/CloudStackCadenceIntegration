@@ -64,7 +64,7 @@ namespace CloudStackCadenceIntegration
             {
                 DefaultDomain = "test-domain",
                 CreateDomain = true,
-                Servers = new List<string>() { "cadence://localhost:7933" }
+                Servers = new List<string>() { "cadence://cadence:7933" }
             };
 
             using (var client = await CadenceClient.ConnectAsync(settings))
