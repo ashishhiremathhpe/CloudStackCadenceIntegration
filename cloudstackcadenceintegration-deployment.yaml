@@ -24,9 +24,9 @@ spec:
         - env:
             - name: ASPNETCORE_ENVIRONMENT
               value: Production
-          image: cloudstackcadenceintegration:dev
+          image: cloudstack-cadence-integration:latest
           name: cloudstackcadenceintegration
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Never
           ports:
             - containerPort: 80
               protocol: TCP

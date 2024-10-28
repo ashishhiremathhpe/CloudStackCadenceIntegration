@@ -2,6 +2,7 @@
 using CloudStackCadenceIntegration.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Neon.Cadence;
 
 namespace CloudStackCadenceIntegration
@@ -55,16 +56,20 @@ namespace CloudStackCadenceIntegration
         }
     }
 
-    public static class Program
+    public class Program
     {
         public static async Task Main(string[] args)
         {
+            ILoggerFactory factory = LoggerFactory.Create(builder => builder.AddConsole());
+            ILogger logger1 = factory.CreateLogger("Program");
+            logger1.LogInformation("Starting Cadence worker...");
+
             // Connect to Cadence
             var settings = new CadenceSettings()
             {
                 DefaultDomain = "test-domain",
                 CreateDomain = true,
-                Servers = new List<string>() { "cadence://cadence:7933" }
+                Servers = new List<string>() { "cadence://cadence.default.svc.cluster.local:7933" }
             };
 
             using (var client = await CadenceClient.ConnectAsync(settings))
@@ -75,15 +80,17 @@ namespace CloudStackCadenceIntegration
                 await client.RegisterWorkflowAsync<ListVmWorkflow>();
                 await client.RegisterActivityAsync<ListVMActivity>();
                 await client.StartWorkerAsync("my-tasks");
-                
+
                 // Start the web server
                 var builder = WebApplication.CreateBuilder(args);
                 {
+                    builder.Services.AddLogging();
                     builder.Services.AddSingleton(client);
                     builder.Services.AddControllers();
                     builder.Services.AddScoped<IVMService, VMService>();
                 }
 
+                logger1.LogInformation("Starting web server...");
                 var app = builder.Build();
                 {
                     app.UseExceptionHandler("/error");

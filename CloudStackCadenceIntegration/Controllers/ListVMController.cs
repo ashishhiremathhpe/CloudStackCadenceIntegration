@@ -1,5 +1,6 @@
 using CloudStackCadenceIntegration.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Neon.Cadence;
 
 namespace CloudStackCadenceIntegration.Controllers
@@ -10,11 +11,13 @@ namespace CloudStackCadenceIntegration.Controllers
     {
         private readonly CadenceClient _cadenceClient;
         private readonly IVMService _vmService;
+        private readonly ILogger<ListVMController> _logger;
 
-        public ListVMController(IVMService vmService, CadenceClient cadenceClient)
+        public ListVMController(IVMService vmService, CadenceClient cadenceClient, ILogger<ListVMController> logger)
         {
             _vmService = vmService;
             _cadenceClient = cadenceClient;
+            _logger = logger;
         }
 
         [HttpGet]

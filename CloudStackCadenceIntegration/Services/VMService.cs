@@ -1,6 +1,5 @@
-using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using Neon.Cadence;
-using Newtonsoft.Json;
 
 namespace CloudStackCadenceIntegration.Services
 {
@@ -11,8 +10,16 @@ namespace CloudStackCadenceIntegration.Services
 
     public class VMService : IVMService
     {
+        
+        private readonly ILogger<VMService> _logger;
+
+        public VMService(ILogger<VMService> logger)
+        {
+            _logger = logger;
+        }
         public string ListVMs(CadenceClient cadenceClient)
         {
+            _logger.LogInformation("Calling Cadence Workflow to list VMs");
             var stub = cadenceClient.NewWorkflowStub<IListVMWorkflow>();
 
             var msg = stub.ListVMAsync("https://qa.cloudstack.cloud/client/api/",
