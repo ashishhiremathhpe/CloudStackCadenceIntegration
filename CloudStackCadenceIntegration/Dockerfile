@@ -6,6 +6,7 @@ FROM mcr.microsoft.com/dotnet/sdk:6.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["CloudStackCadenceIntegration/CloudStackCadenceIntegration.csproj", "CloudStackCadenceIntegration/"]
+COPY ["CloudStack.Net/CloudStack.Net.csproj", "CloudStack.Net/"]
 RUN dotnet restore "CloudStackCadenceIntegration/CloudStackCadenceIntegration.csproj"
 COPY . .
 WORKDIR "/src/CloudStackCadenceIntegration"
