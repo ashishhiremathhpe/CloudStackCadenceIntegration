@@ -16,6 +16,7 @@
 
     <ItemGroup>
       <PackageReference Include="Neon.Cadence" Version="2.19.0" />
+      <PackageReference Include="Npgsql" Version="8.0.5" />
     </ItemGroup>
 
     <ItemGroup>

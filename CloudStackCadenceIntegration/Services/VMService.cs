@@ -6,25 +6,25 @@ namespace CloudStackCadenceIntegration.Services
 {
     public interface IVMService
     {
-        string ListVMs(CadenceClient cadenceClient);
+        ListResponse<UserVmResponse> ListVMs(CadenceClient cadenceClient);
         string DeployVMs(CadenceClient cadenceClient, DeployVirtualMachineRequest request);
     }
 
     public class VMService : IVMService
     {
-        
         private readonly ILogger<VMService> _logger;
 
         public VMService(ILogger<VMService> logger)
         {
             _logger = logger;
         }
-        public string ListVMs(CadenceClient cadenceClient)
+
+        public ListResponse<UserVmResponse> ListVMs(CadenceClient cadenceClient)
         {
             _logger.LogInformation("Calling Cadence Workflow to list VMs");
             var stub = cadenceClient.NewWorkflowStub<IListVMWorkflow>();
 
-            var msg = stub.ListVMAsync("https://localhost:8080/client/api/",
+            var msg = stub.ListVMAsync("http://localhost:8080/client/api/",
                 "ZzNGj3F_J0EOcuT1ZNgbviATBcW9jY7ykbLMac_v6qCXZBPlAlL31qDieGl-q9ojfY0V_S-lRth84oUjVxCBng",
                 "lMgesGM2xufrzPuaGbA7cNK4CCLNKmSCEuNL-Af7ScXwOfl0990ya2iqDedV84sS_i55U9V2tbGX0YMF05CqAw").Result;
 

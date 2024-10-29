@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Neon.Cadence;
+using Npgsql;
 
 namespace CloudStackCadenceIntegration
 {
@@ -11,12 +12,12 @@ namespace CloudStackCadenceIntegration
     public interface IListVMWorkflow : IWorkflow
     {
         [WorkflowMethod]
-        Task<string> ListVMAsync(string serviceUrl, string apiKey, string secretKey);
+        Task<ListResponse<UserVmResponse>> ListVMAsync(string serviceUrl, string apiKey, string secretKey);
     }
 
     public class ListVmWorkflow : WorkflowBase, IListVMWorkflow
     {
-        public async Task<string> ListVMAsync(string serviceUrl, string apiKey, string secretKey)
+        public async Task<ListResponse<UserVmResponse>> ListVMAsync(string serviceUrl, string apiKey, string secretKey)
         {
             var activityStub = Workflow.NewActivityStub<IListVMActivity>();
             return await activityStub.ListVMAsync(serviceUrl, apiKey, secretKey);
@@ -27,12 +28,12 @@ namespace CloudStackCadenceIntegration
     public interface IListVMActivity : IActivity
     {
         [ActivityMethod]
-        Task<string> ListVMAsync(string serviceUrl, string apiKey, string secretKey);
+        Task<ListResponse<UserVmResponse>> ListVMAsync(string serviceUrl, string apiKey, string secretKey);
     }
 
     public class ListVMActivity : ActivityBase, IListVMActivity
     {
-        public async Task<string> ListVMAsync(string serviceUrl, string apiKey, string secretKey)
+        public async Task<ListResponse<UserVmResponse>> ListVMAsync(string serviceUrl, string apiKey, string secretKey)
         {
             var client = new CloudStackAPIClient(
                 new CloudStackAPIProxy(serviceUrl, apiKey, secretKey)
@@ -45,14 +46,15 @@ namespace CloudStackCadenceIntegration
             {
                 // Send the request and get the response
                 var response = client.ListVirtualMachines(request);
-                return response.ToString();
+                Console.WriteLine($"Total VMs found: {response.Count}");
+                return response;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error: {ex.Message}");
             }
 
-            return "";
+            return new ListResponse<UserVmResponse>();
         }
     }
 
@@ -114,11 +116,14 @@ namespace CloudStackCadenceIntegration
 
     public class Program
     {
+        private static CadenceClient client;
+        private static Timer _timer;
+
         public static async Task Main(string[] args)
         {
             ILoggerFactory factory = LoggerFactory.Create(builder => builder.AddConsole());
-            ILogger logger1 = factory.CreateLogger("Program");
-            logger1.LogInformation("Starting Cadence worker...");
+            ILogger logger = factory.CreateLogger("Program");
+            logger.LogInformation("Starting Cadence worker...");
 
             // Connect to Cadence
             var settings = new CadenceSettings()
@@ -129,7 +134,7 @@ namespace CloudStackCadenceIntegration
                 HeartbeatIntervalSeconds = 300
             };
 
-            using (var client = await CadenceClient.ConnectAsync(settings))
+            using (client = await CadenceClient.ConnectAsync(settings))
             {
                 // Register your workflow implementation to let Cadence
                 // know we're open for business.
@@ -149,12 +154,66 @@ namespace CloudStackCadenceIntegration
                     builder.Services.AddScoped<IVMService, VMService>();
                 }
 
-                logger1.LogInformation("Starting web server...");
-                var app = builder.Build();
+                if (args.Length > 0 && args[0].Equals("reflection"))
                 {
-                    app.UseExceptionHandler("/error");
-                    app.MapControllers();
-                    app.Run();
+                    var connString = "Host=localhost:5432;Username=user;Password=password;Database=reflection_db";
+
+                    var dataSourceBuilder = new NpgsqlDataSourceBuilder(connString);
+                    var dataSource = dataSourceBuilder.Build();
+
+                    var conn = await dataSource.OpenConnectionAsync();
+
+                    // Set up a timer to run the ListVMs method every minute
+                    Timer timer = new Timer(_ => ListVMs(client, logger, conn), null, TimeSpan.Zero,
+                        TimeSpan.FromMinutes(1));
+
+                    // Keep the application running
+                    await Task.Delay(Timeout.Infinite);
+                }
+                else
+                {
+                    logger.LogInformation("Starting web server...");
+                    var app = builder.Build();
+                    {
+                        app.UseExceptionHandler("/error");
+                        app.MapControllers();
+                        app.Run();
+                    }
+                }
+            }
+        }
+
+        private static async void ListVMs(CadenceClient client, ILogger logger, NpgsqlConnection conn)
+        {
+            logger.LogInformation("Calling Cadence Workflow to list VMs");
+            var stub = client.NewWorkflowStub<IListVMWorkflow>();
+
+            var msg = stub.ListVMAsync("http://localhost:8080/client/api/",
+                    "ZzNGj3F_J0EOcuT1ZNgbviATBcW9jY7ykbLMac_v6qCXZBPlAlL31qDieGl-q9ojfY0V_S-lRth84oUjVxCBng",
+                    "lMgesGM2xufrzPuaGbA7cNK4CCLNKmSCEuNL-Af7ScXwOfl0990ya2iqDedV84sS_i55U9V2tbGX0YMF05CqAw")
+                .Result;
+
+            logger.LogInformation("Inserting VMs into database...");
+            
+            foreach (var vm in msg.Results)
+            {
+                
+                await using (var cmd = new NpgsqlCommand(@"
+            INSERT INTO vm (id, account, created, name, state) 
+            VALUES (@id, @account, @created, @name, @state)
+            ON CONFLICT (id) 
+            DO UPDATE SET 
+                account = EXCLUDED.account,
+                created = EXCLUDED.created,
+                name = EXCLUDED.name,
+                state = EXCLUDED.state;", conn))
+                {
+                    cmd.Parameters.AddWithValue("id", Guid.Parse(vm.Id)); // Replace with actual id
+                    cmd.Parameters.AddWithValue("account", vm.Account);
+                    cmd.Parameters.AddWithValue("created", vm.Created); // Replace with actual created date
+                    cmd.Parameters.AddWithValue("name", vm.Name);
+                    cmd.Parameters.AddWithValue("state", vm.State);
+                    await cmd.ExecuteNonQueryAsync();
                 }
             }
         }
