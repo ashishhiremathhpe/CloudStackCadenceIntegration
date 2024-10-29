@@ -56,6 +56,62 @@ namespace CloudStackCadenceIntegration
         }
     }
 
+    [WorkflowInterface(TaskList = "my-tasks")]
+    public interface IDeployVMWorkflow : IWorkflow
+    {
+        [WorkflowMethod]
+        Task<string> DeployVMAsync(string serviceUrl, string apiKey, string secretKey, Guid serviceOfferingId,
+            Guid templateId, Guid zoneId);
+    }
+
+    public class DeployVmWorkflow : WorkflowBase, IDeployVMWorkflow
+    {
+        public async Task<string> DeployVMAsync(string serviceUrl, string apiKey, string secretKey,
+            Guid serviceOfferingId, Guid templateId, Guid zoneId)
+        {
+            var activityStub = Workflow.NewActivityStub<IDeployVMActivity>();
+            return await activityStub.DeployVMAsync(serviceUrl, apiKey, secretKey, serviceOfferingId, templateId,
+                zoneId);
+        }
+    }
+
+    [ActivityInterface(TaskList = "my-tasks")]
+    public interface IDeployVMActivity : IActivity
+    {
+        [ActivityMethod]
+        Task<string> DeployVMAsync(string serviceUrl, string apiKey, string secretKey, Guid serviceOfferingId,
+            Guid templateId, Guid zoneId);
+    }
+
+    public class DeployVMActivity : ActivityBase, IDeployVMActivity
+    {
+        public async Task<string> DeployVMAsync(string serviceUrl, string apiKey, string secretKey,
+            Guid serviceOfferingId, Guid templateId, Guid zoneId)
+        {
+            var client = new CloudStackAPIClient(
+                new CloudStackAPIProxy(serviceUrl, apiKey, secretKey)
+            );
+
+            DeployVirtualMachineRequest request = new DeployVirtualMachineRequest()
+            {
+                ServiceOfferingId = serviceOfferingId,
+                TemplateId = templateId,
+                ZoneId = zoneId,
+            };
+
+            try
+            {
+                var result = client.DeployVirtualMachine(request);
+                return result.ToString();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex.Message);
+                return "";
+            }
+        }
+    }
+
     public class Program
     {
         public static async Task Main(string[] args)
@@ -69,7 +125,8 @@ namespace CloudStackCadenceIntegration
             {
                 DefaultDomain = "test-domain",
                 CreateDomain = true,
-                Servers = new List<string>() { "cadence://cadence.default.svc.cluster.local:7933" }
+                Servers = new List<string>() { "cadence://cadence.default.svc.cluster.local:7933" },
+                HeartbeatIntervalSeconds = 300
             };
 
             using (var client = await CadenceClient.ConnectAsync(settings))
@@ -78,7 +135,9 @@ namespace CloudStackCadenceIntegration
                 // know we're open for business.
 
                 await client.RegisterWorkflowAsync<ListVmWorkflow>();
+                await client.RegisterWorkflowAsync<DeployVmWorkflow>();
                 await client.RegisterActivityAsync<ListVMActivity>();
+                await client.RegisterActivityAsync<DeployVMActivity>();
                 await client.StartWorkerAsync("my-tasks");
 
                 // Start the web server
