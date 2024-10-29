@@ -156,7 +156,7 @@ namespace CloudStackCadenceIntegration
 
                 if (args.Length > 0 && args[0].Equals("reflection"))
                 {
-                    var connString = "Host=localhost:5432;Username=user;Password=password;Database=reflection_db";
+                    var connString = "Host=postgres.default.svc.cluster.local:5432;Username=user;Password=password;Database=reflection_db";
 
                     var dataSourceBuilder = new NpgsqlDataSourceBuilder(connString);
                     var dataSource = dataSourceBuilder.Build();
@@ -188,10 +188,17 @@ namespace CloudStackCadenceIntegration
             logger.LogInformation("Calling Cadence Workflow to list VMs");
             var stub = client.NewWorkflowStub<IListVMWorkflow>();
 
-            var msg = stub.ListVMAsync("http://localhost:8080/client/api/",
-                    "ZzNGj3F_J0EOcuT1ZNgbviATBcW9jY7ykbLMac_v6qCXZBPlAlL31qDieGl-q9ojfY0V_S-lRth84oUjVxCBng",
-                    "lMgesGM2xufrzPuaGbA7cNK4CCLNKmSCEuNL-Af7ScXwOfl0990ya2iqDedV84sS_i55U9V2tbGX0YMF05CqAw")
+            var msg = stub.ListVMAsync("https://qa.cloudstack.cloud/client/api/",
+                    "8y--Jfz6BpGLR94eZiKi_1OQhHAQg43ApL_3EJesv8RmDvFpv8TSDTdYDQKT3fIdueb3mCUP9YZgrRuoUaiZmQ",
+                    "UKnRfBaAy8mm2SHaLUAYGKHUcKDWp1Ez9-QItMOfdDeK_JMaPXv4mG8_kabVfOwxMQ9pe7y1LSVh_Ff0ggd_jQ")
                 .Result;
+            
+            
+            if (msg == null || msg.Results == null)
+            {
+                logger.LogError("Failed to retrieve VMs or no VMs found.");
+                return;
+            }
 
             logger.LogInformation("Inserting VMs into database...");
             
