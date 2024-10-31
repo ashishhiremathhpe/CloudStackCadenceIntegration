@@ -6,11 +6,11 @@ metadata:
     kompose.version: 1.34.0 (cbf2835db)
   labels:
     io.kompose.service: cloudstackcadenceintegration
-  name: cloudstackcadenceintegration
+  name: vra-manager
 spec:
   ports:
     - name: "5001"
       port: 5001
       targetPort: 80
   selector:
-    io.kompose.service: cloudstackcadenceintegration
+    io.kompose.service: vra-manager

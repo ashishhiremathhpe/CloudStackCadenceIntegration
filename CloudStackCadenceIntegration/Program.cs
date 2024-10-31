@@ -19,7 +19,14 @@ namespace CloudStackCadenceIntegration
     {
         public async Task<ListResponse<UserVmResponse>> ListVMAsync(string serviceUrl, string apiKey, string secretKey)
         {
-            var activityStub = Workflow.NewActivityStub<IListVMActivity>();
+            var activityStub = Workflow.NewActivityStub<IListVMActivity>(new ActivityOptions
+            {
+                RetryOptions = new RetryOptions
+                {
+                    MaximumAttempts = 6,
+                    InitialInterval = TimeSpan.FromSeconds(10),
+                }
+            });
             return await activityStub.ListVMAsync(serviceUrl, apiKey, secretKey);
         }
     }
@@ -46,14 +53,17 @@ namespace CloudStackCadenceIntegration
             {
                 // Send the request and get the response
                 var response = client.ListVirtualMachines(request);
+                if (response == null )
+                {
+                    throw new Exception(" Failed to retrieve VMs or no VMs found.");
+                }
                 return response;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error: {ex.Message}");
+                throw ex;
             }
-
-            return new ListResponse<UserVmResponse>();
         }
     }
 
@@ -70,7 +80,14 @@ namespace CloudStackCadenceIntegration
         public async Task<string> DeployVMAsync(string serviceUrl, string apiKey, string secretKey,
             Guid serviceOfferingId, Guid templateId, Guid zoneId)
         {
-            var activityStub = Workflow.NewActivityStub<IDeployVMActivity>();
+            var activityStub = Workflow.NewActivityStub<IDeployVMActivity>(new ActivityOptions
+            {
+                RetryOptions = new RetryOptions
+                {
+                    MaximumAttempts = 6,
+                    InitialInterval = TimeSpan.FromSeconds(10),
+                }
+            });
             return await activityStub.DeployVMAsync(serviceUrl, apiKey, secretKey, serviceOfferingId, templateId,
                 zoneId);
         }
@@ -98,6 +115,8 @@ namespace CloudStackCadenceIntegration
                 ServiceOfferingId = serviceOfferingId,
                 TemplateId = templateId,
                 ZoneId = zoneId,
+                Name = "vra-vm",
+                DisplayName = "vra-vm"
             };
 
             try
@@ -127,7 +146,7 @@ namespace CloudStackCadenceIntegration
             // Connect to Cadence
             var settings = new CadenceSettings()
             {
-                DefaultDomain = "test-domain",
+                DefaultDomain = "zvm-core",
                 CreateDomain = true,
                 Servers = new List<string>() { "cadence://cadence.default.svc.cluster.local:7933" },
                 HeartbeatIntervalSeconds = 300,
@@ -153,15 +172,12 @@ namespace CloudStackCadenceIntegration
 
                     var dataSourceBuilder = new NpgsqlDataSourceBuilder(connString);
                     var dataSource = dataSourceBuilder.Build();
-
-                    // Set up a timer to run the ListVMs method every minute
-                    Timer timer = new Timer(_ => ListVMs(client, logger, dataSource), null, TimeSpan.Zero,
-                        TimeSpan.FromMinutes(1));
-
-                    logger.LogInformation("Timer started.");
-                    // Keep the application running
-                    await Task.Delay(Timeout.Infinite);
-                    logger.LogInformation("Timer stopped.");
+                    
+                    for (int i = 0; i < 15; i++)
+                    {
+                        ListVMs(client, logger, dataSource);
+                        Thread.Sleep(60000);
+                    }
                 }
                 else
                 {
@@ -185,14 +201,14 @@ namespace CloudStackCadenceIntegration
             }
         }
 
-        private static async void ListVMs(CadenceClient client, ILogger logger, NpgsqlDataSource dataSource)
+        private static void ListVMs(CadenceClient client, ILogger logger, NpgsqlDataSource dataSource)
         {
             logger.LogInformation("Calling Cadence Workflow to list VMs");
             var stub = client.NewWorkflowStub<IListVMWorkflow>();
 
-            var msg = await stub.ListVMAsync("http://192.168.111.100:8080/client/api/",
+            var msg =  stub.ListVMAsync("http://192.168.111.100:8080/client/api/",
                     "obY9W9UwjJ3XWsagshTgJrvqR2H7SBkcFiTvRslkmSN0niHZLmiZ_MbG7TJw4Kb32SDi-O9-AS6EtJiVWImFRQ",
-                    "");
+                    "g-xxlJxSjxHgtn4uTdRp1iMVd9WVrNH4yN-8-FKavIpaGNTkM0R0xC8req64MvAZ3Xus9lOHaNEvTZnxR6ZJbQ").Result;
 
 
             if (msg == null || msg.Results == null)
@@ -200,61 +216,10 @@ namespace CloudStackCadenceIntegration
                 logger.LogError("Failed to retrieve VMs or no VMs found.");
                 return;
             }
-
-            logger.LogInformation($"Total VMs found: {msg.Count}");
-
-            await using (var conn = await dataSource.OpenConnectionAsync())
-            await using (var createTableCmd = new NpgsqlCommand(@"
-            CREATE TABLE IF NOT EXISTS list_vm (
-                id UUID PRIMARY KEY,
-                account TEXT NOT NULL,
-                created TIMESTAMP NOT NULL,
-                name TEXT NOT NULL,
-                state TEXT NOT NULL
-            );", conn))
-            {
-                await createTableCmd.ExecuteNonQueryAsync();
-            }
-
-            logger.LogInformation("Inserting VMs into database...");
-            try
-            {
-                foreach (var vm in msg.Results)
-                {
-                    await using (var conn = await dataSource.OpenConnectionAsync())
-                    await using (var cmd = new NpgsqlCommand(@"
-                        INSERT INTO list_vm (id, account, created, name, state) 
-                        VALUES (@id, @account, @created, @name, @state)
-                        ON CONFLICT (id) 
-                        DO UPDATE SET 
-                            account = EXCLUDED.account,
-                            created = EXCLUDED.created,
-                            name = EXCLUDED.name,
-                            state = EXCLUDED.state;", conn))
-                    {
-                        cmd.Parameters.AddWithValue("id", Guid.Parse(vm.Id));
-                        cmd.Parameters.AddWithValue("account", vm.Account);
-                        cmd.Parameters.AddWithValue("created", vm.Created);
-                        cmd.Parameters.AddWithValue("name", vm.Name);
-                        cmd.Parameters.AddWithValue("state", vm.State);
-                        await cmd.ExecuteNonQueryAsync();
-
-                        logger.LogInformation("Inserted VMs into database.");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                logger.LogError($"Error inserting VM: {ex.Message}");
-            }
-
-            await using (var conn = await dataSource.OpenConnectionAsync())
-            await using (var cmd = new NpgsqlCommand("SELECT name FROM list_vm", conn))
-            await using (var reader = await cmd.ExecuteReaderAsync())
-            {
-                while (await reader.ReadAsync())
-                    logger.LogInformation(reader.GetString(0));
-            }
+            
+            logger.LogInformation("Total VMs found: {0}", msg.Count);
+            
+            logger.LogInformation("DB insertion completed.");
         }
     }
 }
